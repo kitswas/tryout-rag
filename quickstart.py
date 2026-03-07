@@ -2,15 +2,15 @@
 # -*- coding: utf-8 -*-
 """Quick-start RAG demo - minimal setup, just works."""
 
-import pprint
 import sys
 import io
 import xml.etree.ElementTree as ET
 
+model_name = "HuggingFaceTB/SmolLM2-360M-Instruct"
+
 
 def crawl_sitemap(sitemap_url: str):
     """Fetch URLs from sitemap and return their documents."""
-    from langchain_core.documents import Document
     import requests
     from langchain_text_splitters.html import HTMLSemanticPreservingSplitter
 
@@ -59,7 +59,11 @@ def crawl_sitemap(sitemap_url: str):
             print(f" ✗ ({type(e).__name__})")
 
     print(f"   ✓ Total chunks created: {len(all_docs)}")
-    return all_docs
+
+    # Filter out empty or whitespace-only documents
+    filtered_docs = [doc for doc in all_docs if doc.page_content.strip()]
+    print(f"   ✓ Filtered to {len(filtered_docs)} non-empty chunks")
+    return filtered_docs
 
 
 def main():
@@ -113,7 +117,7 @@ def main():
 
     # Create embeddings
     print("\n3. Setting up embeddings...")
-    embedder = get_embeddings()
+    embedder = get_embeddings(model_name)
     print("   ✓ Embeddings ready")
 
     # Create vector store
@@ -128,7 +132,7 @@ def main():
     try:
         pipe = pipeline(
             "text-generation",
-            model="HuggingFaceTB/SmolLM2-135M-Instruct",
+            model=model_name,
             dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
             device_map="auto",
             max_new_tokens=256,
@@ -147,13 +151,36 @@ def main():
     # Custom output parser to clean up LLM output
     class AnswerExtractor(StrOutputParser):
         def parse(self, text: str) -> str:
-            # Extract answer after "Answer:" in the text
+            # Look for "Answer:" marker and get everything after it
             if "Answer:" in text:
                 answer = text.split("Answer:")[-1].strip()
             else:
                 answer = text.strip()
-            # Clean up any leading/trailing whitespace and quotes
-            return answer.strip('"').strip()
+
+            # Remove any remaining prompt fragments
+            for stop_phrase in ["Question:", "Context:", "Provide", "If the"]:
+                if stop_phrase in answer:
+                    answer = answer.split(stop_phrase)[0].strip()
+
+            # Extract multiple sentences
+            lines = answer.split("\n")
+            result = []
+            for line in lines:
+                line = line.strip()
+                if not line or line.startswith(("1.", "2.", "3.", "-")):
+                    break
+                result.append(line)
+                if len(result) >= 3:
+                    break
+
+            answer = " ".join(result).strip()
+            answer = answer.strip("\"'").strip()
+
+            # Only use fallback for very short responses
+            if not answer or len(answer) < 10:
+                answer = "Unable to find answer in the provided context."
+
+            return answer
 
     print("   ✓ Model loaded")
 
@@ -162,19 +189,33 @@ def main():
 
     prompt = PromptTemplate(
         input_variables=["context", "question"],
-        template="""Answer the question based on the context.
-        
-Context: {context}
+        template="""Use only the provided context to answer the question directly and concisely.
+
+Context:
+{context}
 
 Question: {question}
 
 Answer:""",
     )
 
-    retriever = db.as_retriever(search_kwargs={"k": 2})
+    # Use standard similarity search
+    retriever = db.as_retriever(search_kwargs={"k": 4})
 
     def format_docs(docs):
-        return "\n\n".join(doc.page_content for doc in docs)
+        """Format documents for context."""
+        # Use retrieved docs as-is, with minimal filtering
+        valid_docs = []
+        for doc in docs:
+            content = doc.page_content.strip()
+            # Skip tiny fragments
+            if len(content) > 30:
+                valid_docs.append(content)
+
+        if not valid_docs:
+            valid_docs = [doc.page_content.strip() for doc in docs]
+
+        return "\n\n".join(valid_docs[:3])
 
     def get_question(x):
         if isinstance(x, dict):
@@ -227,9 +268,13 @@ Answer:""",
                 docs = retriever.invoke(question)
                 if docs:
                     print("📚 Source:")
-                    for doc in docs[:1]:
-                        preview = doc.page_content[:100].replace("\n", " ").strip()
-                        print(f'   "{preview}..."')
+                    # Show up to 2 most relevant sources
+                    for i, doc in enumerate(docs[:2], 1):
+                        preview = doc.page_content[:120].replace("\n", " ").strip()
+                        # Truncate with ellipsis
+                        if len(doc.page_content) > 120:
+                            preview = preview[:120] + "..."
+                        print(f'   {i}. "{preview}"')
             except Exception:
                 pass
 

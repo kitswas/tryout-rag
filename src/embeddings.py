@@ -10,7 +10,7 @@ from transformers import AutoTokenizer, AutoModel
 class TransformerEmbeddings(Embeddings):
     """Simple embeddings using transformers directly, without sentence-transformers."""
 
-    def __init__(self, model_name: str = "HuggingFaceTB/SmolLM2-135M-Instruct"):
+    def __init__(self, model_name):
         """Initialize with a transformer model.
 
         Args:
@@ -99,9 +99,7 @@ class TransformerEmbeddings(Embeddings):
         return self.embed_documents([text])[0]
 
 
-def get_embeddings(
-    model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
-) -> Embeddings:
+def get_embeddings(model_name: str) -> Embeddings:
     """Get embeddings using transformers."""
     print(f"✓ Loading embeddings ({model_name})")
     return TransformerEmbeddings(model_name)
