@@ -2,8 +2,64 @@
 # -*- coding: utf-8 -*-
 """Quick-start RAG demo - minimal setup, just works."""
 
+import pprint
 import sys
 import io
+import xml.etree.ElementTree as ET
+
+
+def crawl_sitemap(sitemap_url: str):
+    """Fetch URLs from sitemap and return their documents."""
+    from langchain_core.documents import Document
+    import requests
+    from langchain_text_splitters.html import HTMLSemanticPreservingSplitter
+
+    print(f"\n1. Fetching sitemap from {sitemap_url}...")
+    try:
+        response = requests.get(sitemap_url, timeout=10)
+        response.raise_for_status()
+    except Exception as e:
+        print(f"   ✗ Failed to fetch sitemap: {e}")
+        return []
+
+    # Parse sitemap XML
+    try:
+        root = ET.fromstring(response.content)
+        # Handle namespace
+        namespace = {"ns": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+        urls = [url.text for url in root.findall(".//ns:loc", namespace)]
+        if not urls:
+            # Try without namespace
+            urls = [url.text for url in root.findall(".//loc")]
+    except Exception as e:
+        print(f"   ✗ Failed to parse sitemap: {e}")
+        return []
+
+    print(f"   ✓ Found {len(urls)} URLs")
+
+    # Fetch and process content from each URL
+    print("\n2. Fetching and splitting content from sites...")
+    all_docs = []
+    splitter = HTMLSemanticPreservingSplitter(
+        headers_to_split_on=[("h1", "Header 1"), ("h2", "Header 2"), ("h3", "Header 3")]
+    )
+
+    for i, url in enumerate(urls, 1):
+        try:
+            print(f"   [{i}/{len(urls)}] Processing {url}...", end="", flush=True)
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+
+            # Split HTML into chunks preserving semantic structure
+            chunks = splitter.split_text(response.text)
+            all_docs.extend(chunks)
+            print(f" ✓ ({len(chunks)} chunks)")
+
+        except Exception as e:
+            print(f" ✗ ({type(e).__name__})")
+
+    print(f"   ✓ Total chunks created: {len(all_docs)}")
+    return all_docs
 
 
 def main():
@@ -15,10 +71,11 @@ def main():
 
     print("""
 ╔════════════════════════════════════════════════════════════════╗
-║           RAG System - Virtual GamePad FAQ Demo                ║
+║           RAG System - Virtual GamePad Sitemap Demo            ║
 ║                                                                ║
-║  This demo creates a RAG system from a GitHub FAQ document     ║
-║  and lets you ask questions about it.                          ║
+║  This demo creates a RAG system by crawling the entire         ║
+║  VirtualGamePad website via sitemap and lets you ask           ║
+║  questions about it.                                           ║
 ╚════════════════════════════════════════════════════════════════╝
     """)
 
@@ -26,8 +83,6 @@ def main():
     print("Checking dependencies...")
     try:
         import torch
-        import requests
-        from langchain_text_splitters.markdown import MarkdownTextSplitter
         from langchain_core.vectorstores import InMemoryVectorStore
         from langchain_core.documents import Document
         from src.embeddings import get_embeddings
@@ -48,18 +103,13 @@ def main():
     print("Setting up RAG system...")
     print("=" * 60)
 
-    # Load document
-    print("\n1. Fetching FAQ document...")
-    url = "https://raw.githubusercontent.com/kitswas/VirtualGamePad/refs/heads/main/FAQ.md"
-    response = requests.get(url)
-    text = response.text
-    print(f"   ✓ Loaded {len(text)} characters")
+    # Crawl sitemap and get document chunks
+    sitemap_url = "https://kitswas.github.io/VirtualGamePad/sitemap.xml"
+    docs = crawl_sitemap(sitemap_url)
 
-    # Split documents
-    print("\n2. Splitting into chunks...")
-    splitter = MarkdownTextSplitter(chunk_size=1000, chunk_overlap=100)
-    docs = splitter.split_text(text)
-    print(f"   ✓ Created {len(docs)} chunks")
+    if not docs:
+        print("\n✗ Failed to load documents from sitemap")
+        sys.exit(1)
 
     # Create embeddings
     print("\n3. Setting up embeddings...")
@@ -68,8 +118,7 @@ def main():
 
     # Create vector store
     print("\n4. Building vector database...")
-    documents = [Document(page_content=chunk) for chunk in docs]
-    db = InMemoryVectorStore.from_documents(documents, embedder)
+    db = InMemoryVectorStore.from_documents(docs, embedder)
     print("   ✓ Vector store created")
 
     # Setup LLM
@@ -144,7 +193,7 @@ Answer:""",
     print("   ✓ RAG system ready!")
 
     print("\n" + "=" * 60)
-    print("System ready! Ask a question about VirtualGamePad FAQ.")
+    print("System ready! Ask a question about VirtualGamePad.")
     print("Type 'quit' or 'exit' to stop.\n")
 
     # Interactive loop
