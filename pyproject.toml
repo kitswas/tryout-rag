@@ -1,0 +1,49 @@
+[project]
+name = "python-template"
+version = "0.1.0"
+description = "Python project template"
+authors = [{ name = "Your name", email = "your@email.com" }]
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = []
+
+[dependency-groups]
+dev = ["pdoc>=16.0.0", "ruff>=0.15.0"]
+
+[project.optional-dependencies]
+torch-cpu = ["torch>=2.10.0", "torchvision>=0.25.0"]
+torch-cu128 = ["torch>=2.10.0", "torchvision>=0.25.0"]
+
+[tool.uv]
+conflicts = [[{ extra = "torch-cpu" }, { extra = "torch-cu128" }]]
+
+[tool.uv.sources]
+torch = [
+	{ index = "pytorch-cpu", extra = "torch-cpu" },
+	{ index = "pytorch-cu128", extra = "torch-cu128" },
+]
+torchvision = [
+	{ index = "pytorch-cpu", extra = "torch-cpu" },
+	{ index = "pytorch-cu128", extra = "torch-cu128" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+# Enable if needed. Highly recommended for better code.
+# [tool.ruff.lint]
+# extend-select = [
+# 	"ANN", # type annotations
+# 	"UP",  # pyupgrade
+# 	"PLE", # pylint errors
+# ]
+
+# [tool.ruff.lint.per-file-ignores]
+# "test/**/*.py" = ["ANN"]
