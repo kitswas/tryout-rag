@@ -1,30 +1,41 @@
 [project]
-name = "python-template"
+name = "tryout-rag"
 version = "0.1.0"
-description = "Python project template"
+description = "RAG demo using Hugging Face and LangChain"
 authors = [{ name = "Your name", email = "your@email.com" }]
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+	"langchain>=1.2.10",
+	"langchain-core>=1.2.10",
+	"langchain-text-splitters>=1.1.1",
+	"langchain-huggingface>=1.2.1",
+	"langchain-community>=0.0.10",
+	"tiktoken>=0.4.0",
+	"huggingface-hub>=1.6.0",
+	"transformers>=4.57.6",
+	"numpy>=2.0.0",
+	"accelerate>=1.13.0",
+]
 
 [dependency-groups]
-dev = ["pdoc>=16.0.0", "ruff>=0.15.0"]
+dev = ["pdoc>=16.0.0", "pytest>=9.0.2", "ruff>=0.15.0"]
 
 [project.optional-dependencies]
-torch-cpu = ["torch>=2.10.0", "torchvision>=0.25.0"]
-torch-cu128 = ["torch>=2.10.0", "torchvision>=0.25.0"]
+cpu = ["torch>=2.10.0", "torchvision>=0.25.0"]
+gpu = ["torch>=2.10.0", "torchvision>=0.25.0"]
 
 [tool.uv]
-conflicts = [[{ extra = "torch-cpu" }, { extra = "torch-cu128" }]]
+conflicts = [[{ extra = "cpu" }, { extra = "gpu" }]]
 
 [tool.uv.sources]
 torch = [
-	{ index = "pytorch-cpu", extra = "torch-cpu" },
-	{ index = "pytorch-cu128", extra = "torch-cu128" },
+	{ index = "pytorch-cpu", extra = "cpu" },
+	{ index = "pytorch-cu128", extra = "gpu" },
 ]
 torchvision = [
-	{ index = "pytorch-cpu", extra = "torch-cpu" },
-	{ index = "pytorch-cu128", extra = "torch-cu128" },
+	{ index = "pytorch-cpu", extra = "cpu" },
+	{ index = "pytorch-cu128", extra = "gpu" },
 ]
 
 [[tool.uv.index]]

@@ -1,53 +1,79 @@
-# python-template
+# RAG System - Virtual GamePad FAQ
 
-A template for Python projects.  
-Includes basic project structure, a test suite, doc generation, a code formatter and linter, and a dependency manager.
+A simple RAG (Retrieval-Augmented Generation) system using LangChain with local models.
 
-## How to use
+Loads a GitHub FAQ document, chunks it, creates embeddings, and lets you ask questions about it with a locally running LLM.
 
-You need the uv package/project manager to install the dependencies.  
-You can get [uv here](https://docs.astral.sh/uv/getting-started/installation/).
+## Quick Start
 
-> [!NOTE]
-> To change the Python version, change the `requires-python` field in [pyproject.toml](pyproject.toml)
-> and the number in [.python-version](.python-version).  
-> uv will take care of the rest.
+**Prerequisites:** [uv package manager](https://docs.astral.sh/uv/getting-started/installation/)
 
-**Remember to replace the placeholders in the [pyproject.toml](pyproject.toml) file and change/remove the LICENSE file.**
-
-Set up the environment. (Only once)
+**1. Install dependencies:**
 
 ```bash
-uv venv
-# .venv/Scripts/activate # Windows
-source .venv/bin/activate # Linux/MacOS
-uv sync --link-mode=symlink # Install the dependencies, use -U to update
+uv sync --extra torch-cpu    # For CPU
+# or: uv sync --extra torch-cu128  # For CUDA GPU
 ```
 
-If you want Pytorch (with or without CUDA), you can install it using the `--extra` flag.
+**2. Run the demo:**
 
 ```bash
-uv sync --link-mode=symlink --extra=torch-cpu   # for CPU only
-uv sync --link-mode=symlink --extra=torch-cu128 # for CUDA support
+uv run python quickstart.py
 ```
 
-You can add other dependencies use `uv add`. The following example adds a valid kernel for Jupyter notebooks in VSCode.
+**3. Ask questions:**
 
-```bash
-uv add ipykernel # Similar to pip install ipykernel
+```
+❓ Your question: What games work with this?
+💬 Answer: [LLM generates answer from FAQ]
 ```
 
-To run any script, append `uv run` before the `python` command. (If the environment is inactive)
+## Available Scripts
 
-```bash
-uv run python src/hello.py
+- **`quickstart.py`** - Interactive demo (easiest to get started)
+- **`src/simple_rag.py`** - Interactive RAG with Phi-2/TinyLlama
+- **`src/rag.py`** - Advanced RAG with full customization
+- **`test_setup.py`** - Verify your system is configured correctly
+
+## Documentation
+
+See [RAG_GUIDE.md](RAG_GUIDE.md) for:
+
+- Detailed setup instructions for each implementation
+- Model options and recommendations
+- Troubleshooting tips
+- Performance optimization
+
+## Project Structure
+
+```
+src/
+  ├── embeddings.py    # Windows-friendly embeddings (no sentence-transformers)
+  ├── rag.py           # Main RAG with HuggingFace transformers
+  └── simple_rag.py    # Simplified interactive RAG
+quickstart.py          # Easy first-run experience
+test_setup.py          # Verify dependencies
+RAG_GUIDE.md          # Comprehensive guide
 ```
 
-Get rid of temporary files: (Use with caution)
+## How It Works
 
-```bash
-git clean -fdX -n # Remove the -n flag to actually delete the files
-```
+1. **Load** - Fetch FAQ document from GitHub
+2. **Chunk** - Split into manageable pieces (1000 chars)
+3. **Embed** - Convert to vectors using sentence-transformers
+4. **Index** - Store in InMemoryVectorStore
+5. **Retrieve** - Find relevant chunks for your question
+6. **Generate** - LLM produces answer from context
+
+All processing is **offline** after initial setup!
+
+## Technical Stack
+
+- **LangChain** - RAG orchestration
+- **Transformers** - Local embeddings (no sentence-transformers needed, Windows-friendly)
+- **InMemoryVectorStore** - Vector similarity search
+- **HuggingFace/Ollama** - Local language models
+- **PyTorch** - ML framework
 
 ## Testing and Documentation
 
