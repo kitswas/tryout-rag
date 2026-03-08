@@ -11,69 +11,22 @@ Loads a GitHub FAQ document, chunks it, creates embeddings, and lets you ask que
 **1. Install dependencies:**
 
 ```bash
-uv sync --extra torch-cpu    # For CPU
-# or: uv sync --extra torch-cu128  # For CUDA GPU
+uv sync --extra cpu    # For CPU
+# or: uv sync --extra gpu  # For CUDA GPU
 ```
 
-**2. Run the demo:**
+**2. Launch the UI:**
 
 ```bash
-uv run python quickstart.py
+uv run python -m streamlit run src/streamlit_app.py
 ```
 
 **3. Ask questions:**
 
-```
+```text
 ❓ Your question: What games work with this?
 💬 Answer: [LLM generates answer from FAQ]
 ```
-
-## Available Scripts
-
-- **`quickstart.py`** - Interactive demo (easiest to get started)
-- **`src/simple_rag.py`** - Interactive RAG with Phi-2/TinyLlama
-- **`src/rag.py`** - Advanced RAG with full customization
-- **`test_setup.py`** - Verify your system is configured correctly
-
-## Documentation
-
-See [RAG_GUIDE.md](RAG_GUIDE.md) for:
-
-- Detailed setup instructions for each implementation
-- Model options and recommendations
-- Troubleshooting tips
-- Performance optimization
-
-## Project Structure
-
-```
-src/
-  ├── embeddings.py    # Windows-friendly embeddings (no sentence-transformers)
-  ├── rag.py           # Main RAG with HuggingFace transformers
-  └── simple_rag.py    # Simplified interactive RAG
-quickstart.py          # Easy first-run experience
-test_setup.py          # Verify dependencies
-RAG_GUIDE.md          # Comprehensive guide
-```
-
-## How It Works
-
-1. **Load** - Fetch FAQ document from GitHub
-2. **Chunk** - Split into manageable pieces (1000 chars)
-3. **Embed** - Convert to vectors using sentence-transformers
-4. **Index** - Store in InMemoryVectorStore
-5. **Retrieve** - Find relevant chunks for your question
-6. **Generate** - LLM produces answer from context
-
-All processing is **offline** after initial setup!
-
-## Technical Stack
-
-- **LangChain** - RAG orchestration
-- **Transformers** - Local embeddings (no sentence-transformers needed, Windows-friendly)
-- **InMemoryVectorStore** - Vector similarity search
-- **HuggingFace/Ollama** - Local language models
-- **PyTorch** - ML framework
 
 ## Testing and Documentation
 
