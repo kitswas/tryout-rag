@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+
 import streamlit as st
 
 
@@ -35,18 +36,19 @@ model_id_input = st.sidebar.selectbox(
 
 rag = None
 
+
 # Use session state to store the "active" config
 if "active_model" not in st.session_state:
     st.session_state["active_model"] = model_id_input
 if "active_sitemap" not in st.session_state:
     st.session_state["active_sitemap"] = sitemap_url_input
 
+
 if st.sidebar.button("Build/Update Pipeline"):
     st.session_state["active_model"] = model_id_input
     st.session_state["active_sitemap"] = sitemap_url_input
-    # Clearing the cache for get_rag_pipeline is tricky, but Streamlit
-    # will handle it automatically because the arguments passed to it
-    # will change.
+    rag = None
+
 
 active_model = st.session_state["active_model"]
 active_sitemap = st.session_state["active_sitemap"]
@@ -59,7 +61,7 @@ with st.expander("Pipeline status"):
     else:
         st.write("Pipeline ready.")
 
-question = st.text_input("Question about Virtual Gamepad", value="")
+question = st.text_input("Question about the content on the website", value="")
 ask = st.button("Ask")
 
 try:
@@ -82,10 +84,17 @@ if ask:
             # Run the blocking call in a thread to keep UI responsive
             with ThreadPoolExecutor(max_workers=1) as ex:
                 future = ex.submit(rag.invoke, question)
-                answer = future.result()
+                result = future.result()
 
         st.subheader("Answer")
-        st.code(answer.strip(), language="markdown", wrap_lines=True)
+        st.markdown(result["answer"].strip())
+
+        st.subheader("Retrieved Context")
+        for i, doc in enumerate(result["context"]):
+            with st.expander(
+                f"Source {i + 1}: {doc.metadata.get('source', 'Unknown')}"
+            ):
+                st.write(doc.page_content)
 
 st.markdown("---")
 st.caption(

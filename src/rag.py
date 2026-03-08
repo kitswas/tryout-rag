@@ -5,7 +5,7 @@ from langchain_community.document_loaders.sitemap import SitemapLoader
 from langchain_community.vectorstores import FAISS
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.runnables import RunnablePassthrough
+from langchain_core.runnables import RunnableParallel, RunnablePassthrough
 from langchain_huggingface import (
     ChatHuggingFace,
     HuggingFaceEmbeddings,
@@ -53,7 +53,7 @@ def build_rag(model_id, sitemap_url):
         model=model,
         tokenizer=tokenizer,
         max_new_tokens=256,
-        temperature=0.1,  # Low temperature for more factual responses
+        temperature=0.5,  # Low temperature for more factual responses
         do_sample=True,
         repetition_penalty=1.1,
         return_full_text=False,
@@ -65,7 +65,7 @@ def build_rag(model_id, sitemap_url):
     messages = [
         (
             "system",
-            "You are a helpful assistant. Answer the question based only on the following context. If the context contains technical tradeoffs or steps, explain them clearly and logically. Keep your answer strictly concise. Do not add any extra conversational text, code, or explanations.\n\nContext: {context}",
+            "You are a helpful assistant. Answer the question based only on the following context. If the context contains technical tradeoffs or steps, explain them clearly and logically. Keep your answer strictly concise. Do not add any extra conversational text, code, or explanations. If the question cannot be answered based on the context, say 'Insufficient information'. \n\nContext: {context}",
         ),
         ("human", "{question}"),
     ]
@@ -76,11 +76,20 @@ def build_rag(model_id, sitemap_url):
         return "\n\n".join(doc.page_content for doc in docs)
 
     # 3. Build the LCEL Chain
-    rag_chain = (
-        {"context": retriever | format_docs, "question": RunnablePassthrough()}
-        | prompt
-        | chat_model
-        | StrOutputParser()
+    rag_chain = RunnableParallel(
+        {"context": retriever, "question": RunnablePassthrough()}
+    ).assign(
+        answer=(
+            RunnableParallel(
+                {
+                    "context": lambda x: format_docs(x["context"]),
+                    "question": lambda x: x["question"],
+                }
+            )
+            | prompt
+            | chat_model
+            | StrOutputParser()
+        )
     )
 
     return rag_chain
@@ -105,7 +114,10 @@ if __name__ == "__main__":
     response = rag_pipeline.invoke(query)
 
     print("\n" + "=" * 50)
-    # The pipeline returns the generated text, but we split out the prompt to get just the answer
-    answer = response.strip()
+    # The pipeline returns a dict with 'context' and 'answer'
+    answer = response["answer"].strip()
     print(f"📝 Answer: {answer}")
+    print("\n📚 Context:")
+    for doc in response["context"]:
+        print(f"- {doc.metadata.get('source', 'Unknown source')}")
     print("=" * 50)
