@@ -12,14 +12,16 @@ Loads a sitemap, crawls the pages, creates embeddings, stores them in a local ve
 
 **Prerequisites:** [uv package manager](https://docs.astral.sh/uv/getting-started/installation/)
 
-**1. Install dependencies:**
+Set up the environment. (Only once):
 
 ```bash
-uv sync --extra cpu    # For CPU
-# or: uv sync --extra gpu  # For CUDA GPU
+uv venv
+# .venv/Scripts/activate # Windows
+source .venv/bin/activate # Linux/MacOS
+uv sync --link-mode=symlink # Install the dependencies, use -U to update
 ```
 
-**2. Launch the UI:**
+**Launch the GUI:**
 
 ```bash
 uv run streamlit run app.py
@@ -48,8 +50,7 @@ and enable `Format on Save` for a better experience.
 To fix imports:
 
 ```bash
-uv run ruff check --select I --fix # Sort imports
-uv run ruff check --select F401 --fix # Remove unused imports
+uv run ruff check --select I, F401 --fix # Sort imports and remove unused imports
 ```
 
 To check for linting errors:

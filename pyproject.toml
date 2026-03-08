@@ -2,7 +2,6 @@
 name = "tryout-rag"
 version = "0.1.0"
 description = "RAG demo using Hugging Face and LangChain"
-authors = [{ name = "Your name", email = "your@email.com" }]
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
@@ -21,12 +20,12 @@ dependencies = [
 dev = ["pdoc>=16.0.0", "pytest>=9.0.2", "ruff>=0.15.0"]
 
 # Enable if needed. Highly recommended for better code.
-# [tool.ruff.lint]
-# extend-select = [
-# 	"ANN", # type annotations
-# 	"UP",  # pyupgrade
-# 	"PLE", # pylint errors
-# ]
+[tool.ruff.lint]
+extend-select = [
+	# 	"ANN", # type annotations
+	"UP",  # pyupgrade
+	"PLE", # pylint errors
+]
 
-# [tool.ruff.lint.per-file-ignores]
-# "test/**/*.py" = ["ANN"]
+[tool.ruff.lint.per-file-ignores]
+"test/**/*.py" = ["ANN"]
