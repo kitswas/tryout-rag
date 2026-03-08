@@ -20,33 +20,6 @@ dependencies = [
 [dependency-groups]
 dev = ["pdoc>=16.0.0", "pytest>=9.0.2", "ruff>=0.15.0"]
 
-[project.optional-dependencies]
-cpu = ["torch>=2.10.0", "torchvision>=0.25.0"]
-gpu = ["torch>=2.10.0", "torchvision>=0.25.0"]
-
-[tool.uv]
-conflicts = [[{ extra = "cpu" }, { extra = "gpu" }]]
-
-[tool.uv.sources]
-torch = [
-	{ index = "pytorch-cpu", extra = "cpu" },
-	{ index = "pytorch-cu128", extra = "gpu" },
-]
-torchvision = [
-	{ index = "pytorch-cpu", extra = "cpu" },
-	{ index = "pytorch-cu128", extra = "gpu" },
-]
-
-[[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
-explicit = true
-
-[[tool.uv.index]]
-name = "pytorch-cu128"
-url = "https://download.pytorch.org/whl/cu128"
-explicit = true
-
 # Enable if needed. Highly recommended for better code.
 # [tool.ruff.lint]
 # extend-select = [
