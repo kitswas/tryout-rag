@@ -6,7 +6,11 @@ from langchain_community.vectorstores import FAISS
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
-from langchain_huggingface import HuggingFaceEmbeddings, HuggingFacePipeline
+from langchain_huggingface import (
+    ChatHuggingFace,
+    HuggingFaceEmbeddings,
+    HuggingFacePipeline,
+)
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 
@@ -27,7 +31,7 @@ def build_rag(model_id):
 
     # 2. Split documents into manageable chunks
     print("✂️ Splitting documents...")
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     splits = text_splitter.split_documents(docs)
 
     # 3. Create Local Vector Store (FAISS)
@@ -37,7 +41,7 @@ def build_rag(model_id):
         model_name="sentence-transformers/all-MiniLM-L6-v2"
     )
     vectorstore = FAISS.from_documents(splits, embeddings)
-    retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+    retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
 
     # 4. Set up Local LLM
     print("🤖 Loading local HuggingFace LLM...")
@@ -56,16 +60,17 @@ def build_rag(model_id):
         return_full_text=False,
     )
     llm = HuggingFacePipeline(pipeline=pipe)
+    chat_model = ChatHuggingFace(llm=llm)
 
     # 1. Define a cleaner prompt template tailored for instruction models
-    template = """You are a helpful assistant. Answer the question based only on the following context. Keep your answer strictly concise. Do not add any extra conversational text, code, or explanations.
-
-    Context: {context}
-
-    Question: {question}
-    
-    Answer: """
-    prompt = ChatPromptTemplate.from_template(template)
+    messages = [
+        (
+            "system",
+            "You are a helpful assistant. Answer the question based only on the following context. If the context contains technical tradeoffs or steps, explain them clearly and logically. Keep your answer strictly concise. Do not add any extra conversational text, code, or explanations.\n\nContext: {context}",
+        ),
+        ("human", "{question}"),
+    ]
+    prompt = ChatPromptTemplate.from_messages(messages)
 
     # 2. Helper function to combine retrieved document text
     def format_docs(docs):
@@ -75,7 +80,7 @@ def build_rag(model_id):
     rag_chain = (
         {"context": retriever | format_docs, "question": RunnablePassthrough()}
         | prompt
-        | llm
+        | chat_model
         | StrOutputParser()
     )
 
