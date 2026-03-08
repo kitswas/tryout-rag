@@ -6,7 +6,7 @@ import streamlit as st
 
 @st.cache_resource
 def get_rag_pipeline():
-    model_id = os.getenv("RAG_MODEL", "HuggingFaceTB/SmolLM2-360M-Instruct")
+    model_id = os.getenv("RAG_MODEL", "google/gemma-3-1b-it")
     try:
         from src.rag import build_rag
 
