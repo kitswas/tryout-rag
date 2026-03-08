@@ -22,7 +22,7 @@ uv sync --extra cpu    # For CPU
 **2. Launch the UI:**
 
 ```bash
-uv run python -m streamlit run src/streamlit_app.py
+uv run streamlit run app.py
 ```
 
 ## Testing and Documentation
