@@ -19,10 +19,9 @@ warnings.filterwarnings("ignore")
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
-def build_rag(model_id):
+def build_rag(model_id, sitemap_url):
     # 1. Load documents directly from the sitemap
-    print("🌐 Crawling sitemap...")
-    sitemap_url = "https://kitswas.github.io/VirtualGamePad/sitemap.xml"
+    print(f"🌐 Crawling sitemap: {sitemap_url}")
 
     # SitemapLoader parses the XML and extracts text from all listed URLs
     loader = SitemapLoader(web_path=sitemap_url)
@@ -94,8 +93,9 @@ if __name__ == "__main__":
     # Swap this with "meta-llama/Meta-Llama-3-8B-Instruct" or similar if you have enough VRAM.
     # model_id = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
     model_id = "google/gemma-3-1b-it"
+    sitemap_url = "https://kitswas.github.io/VirtualGamePad/sitemap.xml"
 
-    rag_pipeline = build_rag(model_id)
+    rag_pipeline = build_rag(model_id, sitemap_url)
 
     # Example Query
     query = "What is Virtual Gamepad?"
