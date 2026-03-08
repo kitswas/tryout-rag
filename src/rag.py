@@ -1,155 +1,106 @@
-"""Simple RAG system using LangChain with local models."""
+import os
+import warnings
 
-from langchain_text_splitters import CharacterTextSplitter
-from langchain_core.vectorstores import InMemoryVectorStore
-from langchain_core.documents import Document
-from embeddings import get_embeddings
-from langchain_core.prompts import PromptTemplate
+from langchain_community.document_loaders.sitemap import SitemapLoader
+from langchain_community.vectorstores import FAISS
 from langchain_core.output_parsers import StrOutputParser
-from langchain_community.llms import HuggingFacePipeline
-from transformers import pipeline
-import requests
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnablePassthrough
+from langchain_huggingface import HuggingFaceEmbeddings, HuggingFacePipeline
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+
+# Suppress HuggingFace/Langchain warnings for cleaner output
+warnings.filterwarnings("ignore")
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 
-def load_document_from_url(url: str) -> str:
-    """Load document content from a URL."""
-    response = requests.get(url)
-    response.raise_for_status()
-    return response.text
+def build_rag(model_id):
+    # 1. Load documents directly from the sitemap
+    print("🌐 Crawling sitemap...")
+    sitemap_url = "https://kitswas.github.io/VirtualGamePad/sitemap.xml"
 
+    # SitemapLoader parses the XML and extracts text from all listed URLs
+    loader = SitemapLoader(web_path=sitemap_url)
+    docs = loader.load()
+    print(f"✅ Loaded {len(docs)} pages.")
 
-def create_rag_chain(document_url: str, model_name: str = "huggingFaceM-7B-Instruct"):
-    """
-    Create a RAG chain with local models.
+    # 2. Split documents into manageable chunks
+    print("✂️ Splitting documents...")
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+    splits = text_splitter.split_documents(docs)
 
-    Args:
-        document_url: URL of the document to use as knowledge base
-        model_name: HuggingFace model name for text generation
-
-    Returns:
-        RetrievalQA chain ready to use for question answering
-    """
-
-    # Load document
-    print(f"Fetching document from {document_url}...")
-    document_text = load_document_from_url(document_url)
-
-    # Split document into chunks
-    print("Splitting document into chunks...")
-    text_splitter = CharacterTextSplitter(
-        chunk_size=1000, chunk_overlap=200, separator="\n"
+    # 3. Create Local Vector Store (FAISS)
+    print("🧠 Creating vector embeddings...")
+    # all-MiniLM-L6-v2 is a fast, lightweight local embedding model
+    embeddings = HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-MiniLM-L6-v2"
     )
-    chunks = text_splitter.split_text(document_text)
-    print(f"Created {len(chunks)} chunks")
+    vectorstore = FAISS.from_documents(splits, embeddings)
+    retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
 
-    # Create embeddings
-    print("Setting up embeddings...")
-    embeddings = get_embeddings()
+    # 4. Set up Local LLM
+    print("🤖 Loading local HuggingFace LLM...")
 
-    # Create vector store
-    print("Creating vector store...")
-    documents = [Document(page_content=chunk) for chunk in chunks]
-    vector_store = InMemoryVectorStore.from_documents(documents, embeddings)
+    tokenizer = AutoTokenizer.from_pretrained(model_id)
+    model = AutoModelForCausalLM.from_pretrained(model_id)
 
-    # Set up text generation pipeline
-    print(f"Loading language model: {model_name}...")
-    try:
-        # Try to use a local model via transformers
-        text_gen_pipeline = pipeline(
-            "text-generation",
-            model=model_name,
-            device_map="auto",
-            max_length=512,
-            do_sample=True,
-            temperature=0.5,
-            top_p=0.95,
-        )
-    except Exception as e:
-        print(f"Note: Could not load {model_name}. Using smaller model instead: {e}")
-        # Fallback to a smaller model
-        text_gen_pipeline = pipeline(
-            "text-generation",
-            model="distilgpt2",
-            device_map="auto",
-            max_length=256,
-        )
-
-    llm = HuggingFacePipeline(pipeline=text_gen_pipeline)
-
-    # Create RAG chain using LCEL
-    print("Creating RAG chain...")
-
-    prompt = PromptTemplate.from_template(
-        """Answer the question based on the context.
-
-Context: {context}
-
-Question: {question}
-
-Answer:"""
+    pipe = pipeline(
+        "text-generation",
+        model=model,
+        tokenizer=tokenizer,
+        max_new_tokens=256,
+        temperature=0.1,  # Low temperature for more factual responses
+        do_sample=True,
+        repetition_penalty=1.1,
+        return_full_text=False,
     )
+    llm = HuggingFacePipeline(pipeline=pipe)
 
-    retriever = vector_store.as_retriever(search_kwargs={"k": 3})
+    # 1. Define a cleaner prompt template tailored for instruction models
+    template = """You are a helpful assistant. Answer the question based only on the following context. Keep your answer strictly concise. Do not add any extra conversational text, code, or explanations.
 
+    Context: {context}
+
+    Question: {question}
+    
+    Answer: """
+    prompt = ChatPromptTemplate.from_template(template)
+
+    # 2. Helper function to combine retrieved document text
     def format_docs(docs):
         return "\n\n".join(doc.page_content for doc in docs)
 
-    chain = (
-        {"context": retriever | format_docs, "question": lambda x: x["question"]}
+    # 3. Build the LCEL Chain
+    rag_chain = (
+        {"context": retriever | format_docs, "question": RunnablePassthrough()}
         | prompt
         | llm
         | StrOutputParser()
     )
 
-    return {"chain": chain, "retriever": retriever}
-
-
-def query_rag(rag_system: dict, question: str) -> dict:
-    """
-    Query the RAG system with a question.
-
-    Args:
-        rag_system: Dictionary with 'chain' and 'retriever'
-        question: The question to ask
-
-    Returns:
-        Dictionary with answer and source documents
-    """
-    chain = rag_system["chain"]
-    retriever = rag_system["retriever"]
-
-    # Get answer
-    answer = chain.invoke({"question": question})
-
-    # Get source documents
-    docs = retriever.invoke(question)
-
-    return {"result": answer, "source_documents": docs}
+    return rag_chain
 
 
 if __name__ == "__main__":
-    # URL to the FAQ document
-    faq_url = "https://raw.githubusercontent.com/kitswas/VirtualGamePad/refs/heads/main/FAQ.md"
+    print("Initializing RAG system...")
 
-    # Create RAG chain
-    rag_system = create_rag_chain(faq_url)
+    # TinyLlama is used here so it runs reasonably fast on CPU.
+    # Swap this with "meta-llama/Meta-Llama-3-8B-Instruct" or similar if you have enough VRAM.
+    # model_id = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+    model_id = "google/gemma-3-1b-it"
 
-    # Example questions
-    questions = [
-        "What games can you play with VirtualGamePad?",
-        "How do I connect via USB?",
-        "What causes latency issues?",
-    ]
+    rag_pipeline = build_rag(model_id)
 
-    # Ask questions
-    for question in questions:
-        print(f"\n{'=' * 60}")
-        print(f"Question: {question}")
-        print("=" * 60)
+    # Example Query
+    query = "What is Virtual Gamepad?"
+    print(f"\nQuestion: {query}")
+    print("⏳ Generating answer...")
 
-        result = query_rag(rag_system, question)
+    response = rag_pipeline.invoke(query)
 
-        print(f"\nAnswer:\n{result['result']}")
-        print(f"\nSource documents:")
-        for doc in result.get("source_documents", []):
-            print(f"  - {doc.page_content[:100]}...")
+    print("\n" + "=" * 50)
+    # The pipeline returns the generated text, but we split out the prompt to get just the answer
+    answer = response.strip()
+    print(f"📝 Answer: {answer}")
+    print("=" * 50)
