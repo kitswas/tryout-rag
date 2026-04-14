@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pdoc>=16.0.0", "pytest>=9.0.2", "ruff>=0.15.0"]
+dev = ["pdoc>=16.0.0", "pytest>=9.0.3", "ruff>=0.15.0"]
 
 # Enable if needed. Highly recommended for better code.
 [tool.ruff.lint]
